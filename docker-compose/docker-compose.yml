@@ -39,17 +39,22 @@ services:
         ETHEREUM_JSONRPC_WS_URL: ws://host.docker.internal:8546/
         CHAIN_ID: '11169'
 
-  nft_media_handler:
-    depends_on:
-      - backend
-    extends:
-      file: ./services/nft_media_handler.yml
-      service: nft_media_handler
-    build:
-      context: ..
-      dockerfile: ./docker/Dockerfile
-      args:
-        RELEASE_VERSION: 9.0.2
+  # NFT media handler is disabled: it requires NFT_MEDIA_HANDLER_NODES_MAP
+  # with at least one worker node, which is not configured for this
+  # deployment. Without it the container crash-loops with
+  # `NFT_MEDIA_HANDLER_NODES_MAP must contain at least one node`.
+  # See NOTES.md ("Disabled services") before re-enabling.
+  # nft_media_handler:
+  #   depends_on:
+  #     - backend
+  #   extends:
+  #     file: ./services/nft_media_handler.yml
+  #     service: nft_media_handler
+  #   build:
+  #     context: ..
+  #     dockerfile: ./docker/Dockerfile
+  #     args:
+  #       RELEASE_VERSION: 9.0.2
 
   visualizer:
     extends:
@@ -112,6 +117,12 @@ services:
     extends:
       file: ./services/caddy.yml
       service: caddy
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
 
 volumes:
   caddy-data: {}

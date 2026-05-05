@@ -154,6 +154,32 @@ sudo docker run --rm \
 sudo docker logs -f caddy
 ```
 
+### Caddy log retention
+
+Caddy is the public ingress and writes one access-log line per request,
+so its container log can grow quickly. The Compose definition caps it
+via the Docker `json-file` driver:
+
+```yaml
+caddy:
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+      compress: "true"
+```
+
+That's at most 5 rotated files of 20 MB each (≈100 MB raw, much less on
+disk thanks to gzip compression of rotated files) per container
+lifetime. Tune these knobs in
+[docker-compose/docker-compose.yml](docker-compose/docker-compose.yml)
+if traffic patterns change. To inspect actual on-disk usage:
+
+```bash
+sudo du -sh "$(sudo docker inspect --format '{{.LogPath}}' caddy)"*
+```
+
 ## Smoke tests
 
 Run from the host. `--resolve` is used so the calls hit the local
@@ -286,9 +312,32 @@ This exercises the full `browser -> Cloudflare -> Caddy -> proxy ->
 microservice` path and confirms Cloudflare's Full (strict) mode is
 satisfied with the origin certificate.
 
-## Known unrelated issues
+## Disabled services
 
-- `nft_media_handler` keeps restarting with
-  `NFT_MEDIA_HANDLER_NODES_MAP must contain at least one node`. This
-  is independent of the reverse-proxy / TLS layer and is to be sorted
-  out separately.
+### `nft_media_handler`
+
+The `nft_media_handler` service is **commented out** in
+[docker-compose/docker-compose.yml](docker-compose/docker-compose.yml).
+Reason: it requires `NFT_MEDIA_HANDLER_NODES_MAP` to contain at least
+one worker node, and we have not deployed any worker nodes for this
+chain. With the variable empty/unset the container crash-loops with:
+
+```
+NFT_MEDIA_HANDLER_NODES_MAP must contain at least one node
+```
+
+The `backend` is still started with
+`NFT_MEDIA_HANDLER_ENABLED=true` /
+`NFT_MEDIA_HANDLER_REMOTE_DISPATCHER_NODE_MODE_ENABLED=true` in
+[docker-compose/envs/common-blockscout.env](docker-compose/envs/common-blockscout.env),
+which is harmless on its own — without a worker available, NFT media
+fetching simply does not happen, but nothing else breaks.
+
+To re-enable later:
+
+1. Provision at least one worker node (or run the
+   `nft_media_handler` container with a populated
+   `NFT_MEDIA_HANDLER_NODES_MAP` pointing at a reachable Erlang node).
+2. Uncomment the `nft_media_handler:` block in
+   [docker-compose/docker-compose.yml](docker-compose/docker-compose.yml).
+3. `sudo docker compose -f docker-compose/docker-compose.yml up -d nft_media_handler`.
