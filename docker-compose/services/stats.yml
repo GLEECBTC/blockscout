@@ -25,6 +25,7 @@ services:
     ports:
       - target: 5432
         published: 7433
+        host_ip: 127.0.0.1
     volumes:
       - ./stats-db-data:/var/lib/postgresql/data
     healthcheck:

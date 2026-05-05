@@ -12,3 +12,4 @@ services:
     ports:
       - target: 80
         published: 80
+        host_ip: 127.0.0.1

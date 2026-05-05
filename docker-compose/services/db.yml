@@ -25,6 +25,7 @@ services:
     ports:
       - target: 5432
         published: 7432
+        host_ip: 127.0.0.1
     volumes:
       - ./blockscout-db-data:/var/lib/postgresql/data
     healthcheck:

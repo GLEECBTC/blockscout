@@ -11,7 +11,7 @@ services:
       file: ./services/sig-provider.yml
       service: sig-provider
     ports:
-      - 8083:8050
+      - 127.0.0.1:8083:8050
     
 
   sc-verifier:
@@ -19,7 +19,7 @@ services:
       file: ./services/smart-contract-verifier.yml
       service: smart-contract-verifier
     ports:
-      - 8082:8050
+      - 127.0.0.1:8082:8050
 
   stats-db-init:
     extends:
