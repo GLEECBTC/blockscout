@@ -105,3 +105,14 @@ services:
     extends:
       file: ./services/nginx.yml
       service: proxy
+
+  caddy:
+    depends_on:
+      - proxy
+    extends:
+      file: ./services/caddy.yml
+      service: caddy
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}
