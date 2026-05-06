@@ -78,3 +78,7 @@ tasks_in_progress
 /temp
 
 openapi.yaml
+
+ssl/*/
+ssl/**/*.key
+ssl/**/*.pem

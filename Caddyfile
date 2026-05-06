@@ -14,7 +14,7 @@
 (blockscout_cors_preflight) {
 	@cors_preflight method OPTIONS
 	handle @cors_preflight {
-		header Access-Control-Allow-Origin      "https://explorer.gleec.cloud"
+		header Access-Control-Allow-Origin      "https://evm-explorer.gleec.com"
 		header Access-Control-Allow-Credentials "true"
 		header Access-Control-Allow-Methods     "PUT, GET, POST, OPTIONS, DELETE, PATCH"
 		header Access-Control-Allow-Headers     "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-csrf-token"
@@ -23,8 +23,20 @@
 	}
 }
 
+# Legacy Cloudflare hostname: always send clients to the current explorer domain.
+# TLS for explorer.gleec.cloud uses certs under ssl/gleec.cloud (mounted at /etc/caddy/ssl).
+http://explorer.gleec.cloud {
+	redir https://evm-explorer.gleec.com{uri} permanent
+}
+
 explorer.gleec.cloud {
 	tls /etc/caddy/ssl/gleec.cloud/ssl.pem /etc/caddy/ssl/gleec.cloud/ssl.key
+
+	redir https://evm-explorer.gleec.com{uri} permanent
+}
+
+evm-explorer.gleec.com {
+	tls /etc/caddy/ssl/gleec.com/ssl.pem /etc/caddy/ssl/gleec.com/ssl.key
 
 	encode zstd gzip
 
@@ -41,8 +53,8 @@ explorer.gleec.cloud {
 }
 
 # Stats microservice: nginx :8080 inside `proxy` -> stats:8050
-evm-stats.gleec.cloud {
-	tls /etc/caddy/ssl/gleec.cloud/ssl.pem /etc/caddy/ssl/gleec.cloud/ssl.key
+evm-stats.gleec.com {
+	tls /etc/caddy/ssl/gleec.com/ssl.pem /etc/caddy/ssl/gleec.com/ssl.key
 
 	encode zstd gzip
 
@@ -60,7 +72,7 @@ evm-stats.gleec.cloud {
 
 		header_down -Access-Control-Allow-Methods
 		header_down -Access-Control-Allow-Headers
-		header_down >Access-Control-Allow-Origin      "https://explorer.gleec.cloud"
+		header_down >Access-Control-Allow-Origin      "https://evm-explorer.gleec.com"
 		header_down >Access-Control-Allow-Credentials "true"
 	}
 }
@@ -68,8 +80,8 @@ evm-stats.gleec.cloud {
 # Visualizer microservice: nginx :8081 inside `proxy` -> visualizer:8050
 # Long timeouts mirror proxy_*_timeout 30m + proxy_buffering off from
 # proxy/microservices.conf.template.
-evm-viz.gleec.cloud {
-	tls /etc/caddy/ssl/gleec.cloud/ssl.pem /etc/caddy/ssl/gleec.cloud/ssl.key
+evm-viz.gleec.com {
+	tls /etc/caddy/ssl/gleec.com/ssl.pem /etc/caddy/ssl/gleec.com/ssl.key
 
 	encode zstd gzip
 
@@ -87,7 +99,7 @@ evm-viz.gleec.cloud {
 
 		header_down -Access-Control-Allow-Methods
 		header_down -Access-Control-Allow-Headers
-		header_down >Access-Control-Allow-Origin      "https://explorer.gleec.cloud"
+		header_down >Access-Control-Allow-Origin      "https://evm-explorer.gleec.com"
 		header_down >Access-Control-Allow-Credentials "true"
 
 		flush_interval -1

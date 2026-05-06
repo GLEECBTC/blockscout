@@ -13,21 +13,21 @@ Caddy is added on top via [docker-compose/services/caddy.yml](docker-compose/ser
 
 | Hostname                    | Purpose                       | Caddy upstream | Final service                           |
 | --------------------------- | ----------------------------- | -------------- | --------------------------------------- |
-| `explorer.gleec.cloud`      | Main UI + main API + sockets  | `proxy:80`     | `frontend:3000` and `backend:4000` (split inside the `proxy` nginx by path: `/api*`, `/socket`, `/sitemap.xml`, `/auth/*` go to backend; everything else to frontend) |
-| `evm-stats.gleec.cloud`     | Blockscout `stats` microservice (charts, counters, daily activity) | `proxy:8080`   | `stats:8050`                            |
-| `evm-viz.gleec.cloud`       | Blockscout `visualizer` microservice (Solidity/EVM diagrams) | `proxy:8081`   | `visualizer:8050`                       |
+| `evm-explorer.gleec.com`      | Main UI + main API + sockets  | `proxy:80`     | `frontend:3000` and `backend:4000` (split inside the `proxy` nginx by path: `/api*`, `/socket`, `/sitemap.xml`, `/auth/*` go to backend; everything else to frontend) |
+| `evm-stats.gleec.com`     | Blockscout `stats` microservice (charts, counters, daily activity) | `proxy:8080`   | `stats:8050`                            |
+| `evm-viz.gleec.com`       | Blockscout `visualizer` microservice (Solidity/EVM diagrams) | `proxy:8081`   | `visualizer:8050`                       |
 
 All three share the **same** Cloudflare Origin Certificate
-`*.gleec.cloud, gleec.cloud` mounted into Caddy from
+`*.gleec.com` mounted into Caddy from
 [ssl/](ssl/) (which is a symlink pointing at `/home/tech/ssl`):
 
 ```
-/home/tech/blockscout/ssl/gleec.cloud/ssl.pem
-/home/tech/blockscout/ssl/gleec.cloud/ssl.key
+/home/tech/blockscout/ssl/gleec.com/ssl.pem
+/home/tech/blockscout/ssl/gleec.com/ssl.key
 ```
 
 The wildcard covers exactly one label, so all three names are valid
-under it; nested subdomains like `stats.explorer.gleec.cloud` would not
+under it; nested subdomains like `stats.evm-explorer.gleec.com` would not
 fit and are intentionally avoided.
 
 ## Request flow
@@ -35,9 +35,9 @@ fit and are intentionally avoided.
 ```mermaid
 flowchart LR
     Browser -->|HTTPS:443| CF[Cloudflare]
-    CF -->|"Host: explorer.gleec.cloud"| Caddy
-    CF -->|"Host: evm-stats.gleec.cloud"| Caddy
-    CF -->|"Host: evm-viz.gleec.cloud"| Caddy
+    CF -->|"Host: evm-explorer.gleec.com"| Caddy
+    CF -->|"Host: evm-stats.gleec.com"| Caddy
+    CF -->|"Host: evm-viz.gleec.com"| Caddy
 
     subgraph caddyHost [Caddy container]
         Caddy
@@ -65,7 +65,7 @@ Notes on the legs:
   which is wrong for our public origin. Caddy rewrites it on the fly:
   it answers `OPTIONS` preflights itself with the correct CORS headers,
   and on actual responses it overwrites
-  `Access-Control-Allow-Origin: https://explorer.gleec.cloud`
+  `Access-Control-Allow-Origin: https://evm-explorer.gleec.com`
   using the `>` operator (unconditional set) in `header_down`.
 - The visualizer leg keeps the long upstream timeouts that exist in
   the nginx template (`proxy_*_timeout 30m`, `proxy_buffering off`)
@@ -121,12 +121,12 @@ sudo docker compose -f docker-compose/docker-compose.yml \
 Relevant variables:
 
 ```
-NEXT_PUBLIC_APP_HOST=explorer.gleec.cloud
-NEXT_PUBLIC_API_HOST=explorer.gleec.cloud
+NEXT_PUBLIC_APP_HOST=evm-explorer.gleec.com
+NEXT_PUBLIC_API_HOST=evm-explorer.gleec.com
 NEXT_PUBLIC_API_PROTOCOL=https
 NEXT_PUBLIC_API_WEBSOCKET_PROTOCOL=wss
-NEXT_PUBLIC_STATS_API_HOST=https://evm-stats.gleec.cloud
-NEXT_PUBLIC_VISUALIZE_API_HOST=https://evm-viz.gleec.cloud
+NEXT_PUBLIC_STATS_API_HOST=https://evm-stats.gleec.com
+NEXT_PUBLIC_VISUALIZE_API_HOST=https://evm-viz.gleec.com
 ```
 
 `NEXT_PUBLIC_STATS_API_HOST` and `NEXT_PUBLIC_VISUALIZE_API_HOST`
@@ -191,7 +191,7 @@ CA, so curl's default trust store does not chain it).
 ### 1. DNS sanity (through Cloudflare)
 
 ```bash
-for h in explorer.gleec.cloud evm-stats.gleec.cloud evm-viz.gleec.cloud; do
+for h in evm-explorer.gleec.com evm-stats.gleec.com evm-viz.gleec.com; do
   printf '%-30s -> %s\n' "$h" "$(dig +short "$h" | head -3 | tr '\n' ' ')"
 done
 ```
@@ -201,19 +201,19 @@ Expected: each hostname resolves to Cloudflare anycast IPs.
 ### 2. HTTP -> HTTPS redirect on the main host
 
 ```bash
-curl -sI -H 'Host: explorer.gleec.cloud' http://127.0.0.1/ | head -5
+curl -sI -H 'Host: evm-explorer.gleec.com' http://127.0.0.1/ | head -5
 ```
 
-Expected: `HTTP/1.1 308 Permanent Redirect` with `Location: https://explorer.gleec.cloud/`.
+Expected: `HTTP/1.1 308 Permanent Redirect` with `Location: https://evm-explorer.gleec.com/`.
 
 ### 3. Main UI / API through Caddy
 
 ```bash
-curl -skI --resolve explorer.gleec.cloud:443:127.0.0.1 \
-  https://explorer.gleec.cloud/ | head -5
+curl -skI --resolve evm-explorer.gleec.com:443:127.0.0.1 \
+  https://evm-explorer.gleec.com/ | head -5
 
-curl -sk --resolve explorer.gleec.cloud:443:127.0.0.1 \
-  https://explorer.gleec.cloud/api/v2/stats \
+curl -sk --resolve evm-explorer.gleec.com:443:127.0.0.1 \
+  https://evm-explorer.gleec.com/api/v2/stats \
   -w '\nhttp=%{http_code}\n' | tail -2
 ```
 
@@ -222,8 +222,8 @@ Expected: `HTTP/2 200` for `/`, JSON with `total_blocks` etc. for `/api/v2/stats
 ### 4. Stats microservice over its own origin
 
 ```bash
-curl -sk --resolve evm-stats.gleec.cloud:443:127.0.0.1 \
-  https://evm-stats.gleec.cloud/api/v1/pages/main \
+curl -sk --resolve evm-stats.gleec.com:443:127.0.0.1 \
+  https://evm-stats.gleec.com/api/v1/pages/main \
   -w '\nhttp=%{http_code}\n' | tail -2
 ```
 
@@ -232,12 +232,12 @@ Expected: JSON with `average_block_time`, `total_blocks`, etc., HTTP 200.
 ### 5. CORS preflight (handled in Caddy, never hits upstream)
 
 ```bash
-curl -ski --resolve evm-stats.gleec.cloud:443:127.0.0.1 \
+curl -ski --resolve evm-stats.gleec.com:443:127.0.0.1 \
   -X OPTIONS \
-  -H 'Origin: https://explorer.gleec.cloud' \
+  -H 'Origin: https://evm-explorer.gleec.com' \
   -H 'Access-Control-Request-Method: GET' \
   -H 'Access-Control-Request-Headers: content-type,authorization' \
-  https://evm-stats.gleec.cloud/api/v1/pages/main \
+  https://evm-stats.gleec.com/api/v1/pages/main \
   | sed -n '1,/^\r$/p' | tr -d '\r' \
   | grep -iE '^(HTTP|access-control)'
 ```
@@ -249,18 +249,18 @@ HTTP/2 204
 access-control-allow-credentials: true
 access-control-allow-headers: ...,Authorization,x-csrf-token
 access-control-allow-methods: PUT, GET, POST, OPTIONS, DELETE, PATCH
-access-control-allow-origin: https://explorer.gleec.cloud
+access-control-allow-origin: https://evm-explorer.gleec.com
 access-control-max-age: 1728000
 ```
 
-Same shape for `evm-viz.gleec.cloud`.
+Same shape for `evm-viz.gleec.com`.
 
 ### 6. CORS on a real GET (Caddy rewrites upstream's `localhost`)
 
 ```bash
-curl -ski --resolve evm-stats.gleec.cloud:443:127.0.0.1 \
-  -H 'Origin: https://explorer.gleec.cloud' \
-  https://evm-stats.gleec.cloud/api/v1/pages/main \
+curl -ski --resolve evm-stats.gleec.com:443:127.0.0.1 \
+  -H 'Origin: https://evm-explorer.gleec.com' \
+  https://evm-stats.gleec.com/api/v1/pages/main \
   | sed -n '1,/^\r$/p' | tr -d '\r' \
   | grep -iE '^(HTTP|access-control|server|via)'
 ```
@@ -270,7 +270,7 @@ Expected:
 ```
 HTTP/2 200
 access-control-allow-credentials: true
-access-control-allow-origin: https://explorer.gleec.cloud
+access-control-allow-origin: https://evm-explorer.gleec.com
 server: nginx/1.29.8
 via: 1.1 Caddy
 ```
@@ -281,16 +281,16 @@ The `server: nginx/.../via: 1.1 Caddy` pair confirms the chain
 ### 7. Frontend really uses the new origins
 
 ```bash
-curl -sk --resolve explorer.gleec.cloud:443:127.0.0.1 \
-  https://explorer.gleec.cloud/assets/envs.js \
+curl -sk --resolve evm-explorer.gleec.com:443:127.0.0.1 \
+  https://evm-explorer.gleec.com/assets/envs.js \
   | grep -E 'NEXT_PUBLIC_(STATS|VISUALIZE)_API_HOST'
 ```
 
 Expected:
 
 ```
-NEXT_PUBLIC_VISUALIZE_API_HOST: "https://evm-viz.gleec.cloud",
-NEXT_PUBLIC_STATS_API_HOST: "https://evm-stats.gleec.cloud",
+NEXT_PUBLIC_VISUALIZE_API_HOST: "https://evm-viz.gleec.com",
+NEXT_PUBLIC_STATS_API_HOST: "https://evm-stats.gleec.com",
 ```
 
 If these lines still point at the old `:8080`/`:8081` URLs, the
@@ -302,9 +302,9 @@ If these lines still point at the old `:8080`/`:8081` URLs, the
 Same calls as above, but without `--resolve`, e.g.:
 
 ```bash
-curl -sI https://explorer.gleec.cloud/ | head -5
-curl -s  https://evm-stats.gleec.cloud/api/v1/pages/main \
-  -H 'Origin: https://explorer.gleec.cloud' \
+curl -sI https://evm-explorer.gleec.com/ | head -5
+curl -s  https://evm-stats.gleec.com/api/v1/pages/main \
+  -H 'Origin: https://evm-explorer.gleec.com' \
   -o /dev/null -w 'http=%{http_code}\n'
 ```
 
